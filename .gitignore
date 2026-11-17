@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.apk
+*.aab
+*.keystore
+*.jks
+.env
+.env.*
+*.bin
+models/
+.DS_Store
