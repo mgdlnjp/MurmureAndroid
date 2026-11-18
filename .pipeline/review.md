@@ -1,3 +1,44 @@
+# Revue — cycle 2 (commit 7b7e80a)
+
+## Verdict
+**APPROVED** — R1 résolu, recommandations 1-8 correctement traitées, aucun nouveau défaut bloquant. tsc 0 erreur, Jest 68/68, 176 tests JVM, lint module 0 erreur, assembleDebug OK.
+
+## Critères d'acceptation
+| # | Critère | Statut |
+|---|---|---|
+| 1 | npm install / expo install --check | OK |
+| 2 | tsc --noEmit strict | OK |
+| 3 | Jest + couverture | OK (68 tests) |
+| 4 | Prebuild, manifeste, ABI, idempotence | OK (minSdk 26 dans manifeste et APK) |
+| 5 | Tests JVM | OK (176 ; 1 test modifié légitimement — O5 inversé) |
+| 6 | assembleDebug + .so arm64-v8a | OK |
+| 7 | Pas de secret/.bin/keystore/android racine ; eas preview apk | OK |
+| 8 | Chaînes FR/EN, slogan | OK |
+| 9 | Aucun texte dicté dans les logs | OK |
+
+Checklist manuelle sur téléphone : à faire (changes.md, cycle 2, points 1-7).
+
+## Problèmes bloquants
+Aucun.
+
+## Recommandations (non bloquantes)
+1. O7 ModelManager.kt:102-108 : supprimer partFile avant installedFile dans delete().
+2. O8 AudioRecorder : drapeau `running` par session.
+3. TextCleanup.kt:8-13 : ajouter `\b` après les mots-marqueurs (« (musicien) », `*musical*` supprimés à tort).
+4. specs.md:229 : « API 29+ » → 30 pour le type FGS micro.
+5. changes.md / tests.md cycle 2 mentionnent « HEAD 26ae7d5 » alors que 7b7e80a existe.
+6. O9 : gardes SDK 26 devenues inutiles (ObsoleteSdkInt), retrait possible.
+7. Reports cycle 1 : points 9-12 (espace disque sur 200, erreur nativeInit, .pipeline versionné, test Robolectric).
+8. Sur appareil : aperçu presse-papiers masqué Android 13+, ACTION_PASTE avec clip sensible, libération micro, arrêt 120 s.
+
+## Sécurité
+Branche dédiée, main intacte (1567c6f). Aucun secret. Clips de repli sensibles, plus de copie silencieuse, clear() efface la copie corrompue, onInterrupt n'est plus exploitable. Langue FR/EN garantie côté natif.
+
+## Performances
+Pas de régression. À surveiller : recompute() par événement, HistoryStore.add sur le main thread, priorité du thread whisper.
+
+---
+
 # Revue — cycle 1 (commit 26ae7d5)
 
 ## Verdict

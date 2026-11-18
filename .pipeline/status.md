@@ -4,7 +4,7 @@
 - **Date** : 2026-11-17
 - **Projet** : ~/Documents/PhoneApp/MurmureAndroid
 - **Branche** : feature/murmure-android-bulle (principale : main)
-- **Étape courante** : 4 — Reviewer (cycle 2)
+- **Étape courante** : 6 — VALIDÉ EN ATTENTE DE FUSION
 - **Cycle courant** : 2
 
 ## Journal
@@ -17,3 +17,4 @@
 - 2026-11-18 : Reviewer CHANGES_REQUESTED (R1 : API 26 non protégées, minSdk 24). Cycle 2 — Coder.
 - 2026-11-18 : Coder cycle 2 terminé (R1 + recos 1-8, jest 68, gradle 158, lint OK). Étape 3 — Tester (cycle 2).
 - 2026-11-18 : Tester cycle 2 PASS (jest 68, gradle 176, lint OK, minSdk 26). Étape 4 — Reviewer (cycle 2).
+- 2026-11-18 : Reviewer cycle 2 APPROVED (0 bloquant). Statut : VALIDÉ EN ATTENTE DE FUSION. Fusion dans main en attente de validation humaine.
