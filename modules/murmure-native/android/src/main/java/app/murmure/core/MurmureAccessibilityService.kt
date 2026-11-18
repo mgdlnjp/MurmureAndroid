@@ -78,7 +78,8 @@ class MurmureAccessibilityService : AccessibilityService() {
   }
 
   override fun onInterrupt() {
-    cleanup()
+    // N'importe quelle app peut déclencher onInterrupt via AccessibilityManager.interrupt() :
+    // on n'interrompt donc pas la dictée. Le nettoyage complet se fait dans onUnbind/onDestroy.
   }
 
   override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -320,14 +321,24 @@ class MurmureAccessibilityService : AccessibilityService() {
   // region Premier plan (micro)
 
   private fun createNotificationChannel() {
-    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    // minSdk 26 : garde conservée par robustesse (lint NewApi en erreur).
+    if (Build.VERSION.SDK_INT < 26) return
+    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
     val channel = NotificationChannel(CHANNEL_ID, getString(R.string.murmure_notification_channel), NotificationManager.IMPORTANCE_LOW)
     channel.setShowBadge(false)
     nm.createNotificationChannel(channel)
   }
 
+  private fun notificationBuilder(): Notification.Builder =
+    if (Build.VERSION.SDK_INT >= 26) {
+      Notification.Builder(this, CHANNEL_ID)
+    } else {
+      @Suppress("DEPRECATION")
+      Notification.Builder(this)
+    }
+
   private fun buildNotification(): Notification =
-    Notification.Builder(this, CHANNEL_ID)
+    notificationBuilder()
       .setSmallIcon(R.drawable.murmure_notification_icon)
       .setContentTitle(getString(R.string.murmure_notification_title))
       .setContentText(getString(R.string.murmure_notification_text))
@@ -337,7 +348,8 @@ class MurmureAccessibilityService : AccessibilityService() {
 
   private fun startForegroundSafe() {
     try {
-      if (Build.VERSION.SDK_INT >= 29) {
+      // FOREGROUND_SERVICE_TYPE_MICROPHONE est API 30 ; avant, aucun type n'est exigé pour le micro.
+      if (Build.VERSION.SDK_INT >= 30) {
         startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
       } else {
         startForeground(NOTIF_ID, buildNotification())

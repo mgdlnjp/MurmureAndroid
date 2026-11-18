@@ -127,11 +127,15 @@ object HistoryStore {
     write(context, read(context).filterNot { it.id == id })
   }
 
+  /** Vide l'historique, y compris une éventuelle copie corrompue conservée par [read]. */
   fun clear(context: Context) = synchronized(lock) {
     write(context, emptyList())
+    corruptFile(context).delete()
   }
 
   private fun file(context: Context) = File(context.filesDir, FILE_NAME)
+
+  private fun corruptFile(context: Context) = File(context.filesDir, "$FILE_NAME.corrupt")
 
   private fun read(context: Context): List<HistoryItem> {
     val f = file(context)
@@ -146,7 +150,7 @@ object HistoryStore {
       parse(content)
     } catch (e: JSONException) {
       Log.w(TAG, "history corrupted, reset")
-      val corrupt = File(f.parentFile, "$FILE_NAME.corrupt")
+      val corrupt = corruptFile(context)
       corrupt.delete()
       f.renameTo(corrupt)
       emptyList()

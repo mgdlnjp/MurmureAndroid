@@ -16,10 +16,8 @@ enum class InsertOutcome { SET_TEXT, PASTED, CLIPBOARD_ONLY, NOTHING }
 /** Construit un FieldInfo à partir d'un nœud (lecture du texte uniquement si [withText]). */
 fun fieldInfoOf(node: AccessibilityNodeInfo, withText: Boolean = false): FieldInfo {
   val text = if (withText) node.text?.toString() else null
-  val showingHint = when {
-    Build.VERSION.SDK_INT >= 26 -> node.isShowingHintText
-    else -> text != null && node.hintText != null && text == node.hintText?.toString()
-  }
+  // isShowingHintText et hintText sont API 26 (= minSdk) ; garde conservée par robustesse.
+  val showingHint = if (Build.VERSION.SDK_INT >= 26) node.isShowingHintText else false
   return FieldInfo(
     packageName = node.packageName?.toString(),
     isEditable = node.isEditable,
@@ -31,6 +29,9 @@ fun fieldInfoOf(node: AccessibilityNodeInfo, withText: Boolean = false): FieldIn
     selectionEnd = node.textSelectionEnd
   )
 }
+
+/** Chaîne de ClipDescription.EXTRA_IS_SENSITIVE (API 33), reconnue par Gboard sur les versions antérieures. */
+internal const val LEGACY_CLIP_EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
 /** Insertion du texte dicté : SET_TEXT fusionné → collage → presse-papiers seul. */
 object TextInserter {
@@ -57,12 +58,9 @@ object TextInserter {
     if (info.isEditable && (info.text?.length ?: 0) + text.length <= MAX_SET_TEXT_LENGTH) {
       when (trySetText(node, info, text)) {
         SetTextVerdict.CONFIRMED -> return InsertOutcome.SET_TEXT
-        SetTextVerdict.PROBABLY_APPLIED -> {
-          // Le champ a vraisemblablement reçu le texte (reformaté, tronqué ou illisible) :
-          // pas de collage, qui créerait un doublon. Copie silencieuse en filet de sécurité.
-          copyToClipboard(service, text)
-          return InsertOutcome.SET_TEXT
-        }
+        // Le champ a vraisemblablement reçu le texte (reformaté, tronqué ou illisible) :
+        // pas de collage (doublon) ni de copie silencieuse ; la dictée reste dans l'historique.
+        SetTextVerdict.PROBABLY_APPLIED -> return InsertOutcome.SET_TEXT
         SetTextVerdict.FAILED -> Unit
       }
     }
@@ -96,16 +94,15 @@ object TextInserter {
     return InsertOutcome.CLIPBOARD_ONLY
   }
 
+  /**
+   * Copie de repli : le texte dicté est marqué sensible pour qu'Android 13+ ne l'affiche pas
+   * dans l'aperçu du presse-papiers et que les claviers ne l'archivent pas dans leur historique.
+   */
   fun copyToClipboard(context: Context, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
     val clip = ClipData.newPlainText("Murmure", text)
-    val extras = PersistableBundle()
-    if (Build.VERSION.SDK_INT >= 33) {
-      extras.putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false)
-    } else {
-      extras.putBoolean("android.content.extra.IS_SENSITIVE", false)
-    }
-    clip.description.extras = extras
+    val key = if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else LEGACY_CLIP_EXTRA_IS_SENSITIVE
+    clip.description.extras = PersistableBundle().apply { putBoolean(key, true) }
     cm.setPrimaryClip(clip)
   }
 

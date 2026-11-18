@@ -34,8 +34,10 @@ android {
     }
   }
 
-  lintOptions {
-    abortOnError false
+  lint {
+    // Tout appel d'API plus récente que minSdk (26) sans garde SDK_INT fait échouer le lint.
+    error 'NewApi'
+    abortOnError true
   }
 
   testOptions {

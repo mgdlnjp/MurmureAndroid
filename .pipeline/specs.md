@@ -8,8 +8,8 @@ Livrer une app Android « Murmure » (Expo SDK 58 + TypeScript, module natif loc
 - **Identifiants** : nom affiché `Murmure`, slug `murmure-android`, scheme `murmure`, `android.package` = `app.murmure.android`, package Kotlin du module = `app.murmure.core`, nom du module natif = `MurmureNative`, version `0.1.0`, `versionCode` 1.
 - **Slogan / identité** reprise de l'app macOS : « Tu parles. Murmure écrit. » / « You speak. Murmure writes. » ; couleur d'accent `#F97316` (orange), accent foncé `#E2510C`, danger `#EF4444`, succès `#34BD75`. Langue de l'UI : FR si la première langue du téléphone commence par `fr`, sinon EN (même règle que `Localization.swift` du Mac, fonction `L(fr, en)`).
 - **ABI** : `arm64-v8a` uniquement (tous les téléphones visés). Pas d'x86_64 (le testeur n'a pas d'émulateur garanti ; réduit fortement le temps de build NDK).
-- **minSdk** : celui par défaut du SDK 58 (≥ 24). Fonctionnalités dépendant d'une API plus récente protégées par `Build.VERSION.SDK_INT`.
-- **Langue de dictée** : réglage `auto` (détection restreinte à FR/EN, jamais de traduction, comme sur Mac) par défaut, `fr` ou `en` en option (plus rapide : évite la passe de détection).
+- **minSdk** : 26 (Android 8.0), fixé via `expo-build-properties` (`android.minSdkVersion: 26`) dans `app.config.ts` (cycle 2, R1). Les appels API 26+ (`NotificationChannel`, `Notification.Builder(ctx, id)`, `isShowingHintText`) restent protégés par `Build.VERSION.SDK_INT` par robustesse ; la règle lint `NewApi` est en erreur dans le module (`abortOnError true`).
+- **Langue de dictée** : réglage `auto` (détection restreinte à FR/EN, jamais de traduction, comme sur Mac) par défaut, `fr` ou `en` en option (plus rapide : évite la passe de détection). Si la détection échoue, repli explicite sur `fr` (jamais de transcription dans une autre langue).
 - **Durée max d'un enregistrement** : 120 s (arrêt + transcription automatiques). En dessous de 0,4 s : ignoré (pas de transcription).
 - **Historique** : écrit par le code natif (le service tourne sans JS), fichier JSON local, 500 entrées max (les plus anciennes supprimées). Aucune donnée ne sort du téléphone (seule requête réseau : téléchargement du modèle depuis Hugging Face).
 - **Bulle** masquée dans l'app Murmure elle-même, sur l'écran de verrouillage et sur tout champ mot de passe / sensible.
@@ -219,7 +219,7 @@ fun insert(service: AccessibilityService, target: AccessibilityNodeInfo?, text: 
 ```
 1. Si `text` vide → `NOTHING`. Si cible absente/obsolète (`refresh()` false) → re-chercher `rootInActiveWindow.findFocus(FOCUS_INPUT)`. Si la cible est sensible : ni insertion ni presse-papiers, toast « Champ protégé », `NOTHING` (l'entrée d'historique est quand même enregistrée).
 2. `ACTION_SET_TEXT` avec `TextMerge.merge(...)`, puis `ACTION_SET_SELECTION` (start=end=cursor). Vérifier après `refresh()` que le texte du nœud contient `text` ; si oui → `SET_TEXT`.
-3. Sinon : presse-papiers (`ClipData` avec label « Murmure », marquer `EXTRA_IS_SENSITIVE=false`) + `ACTION_PASTE` ; si l'action retourne true → `PASTED`.
+3. Sinon : presse-papiers (`ClipData` avec label « Murmure », marqué sensible : `ClipDescription.EXTRA_IS_SENSITIVE=true` en API 33+, clé `android.content.extra.IS_SENSITIVE` avant) + `ACTION_PASTE` ; si l'action retourne true → `PASTED`. Vérification de SET_TEXT (cycle 2) : contenu inchangé → échec (collage) ; contient le texte → `SET_TEXT` ; modifié sans le contenir → `SET_TEXT` probable, sans collage ni copie silencieuse.
 4. Sinon : texte laissé dans le presse-papiers + toast « Texte copié — colle-le avec un appui long » → `CLIPBOARD_ONLY`.
 
 ### `MurmureAccessibilityService.kt`
@@ -229,7 +229,7 @@ fun insert(service: AccessibilityService, target: AccessibilityNodeInfo?, text: 
   - tap en `IDLE` : si modèle absent → toast + ouvre l'app (`/model`) ; si `RECORD_AUDIO` refusée → toast + ouvre l'app (`/onboarding`) ; sinon `startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)` (API 29+ avec type ; try/catch `ForegroundServiceStartNotAllowedException`/`SecurityException` → continuer sans FGS et journaliser) puis `AudioRecorder.start()` ; retour haptique léger.
   - tap en `RECORDING` : `stop()` ; `stopForeground(STOP_FOREGROUND_REMOVE)` ; si < 0,4 s → IDLE ; si `isSilenced` → toast « Le micro a été coupé par Android… » → IDLE ; sinon `TRANSCRIBING` → `WhisperEngine.transcribe` → `TextCleanup.clean` → `TextInserter.insert` → `HistoryStore.add` → émettre `onHistoryChanged` → IDLE.
   - appui long en `RECORDING` : annuler (pas de transcription). Tap en `TRANSCRIBING` : ignoré.
-- `onInterrupt`, `onUnbind`/`onDestroy` : retirer la vue, arrêter l'enregistrement, `WhisperEngine.release()`.
+- `onUnbind`/`onDestroy` : retirer la vue, arrêter l'enregistrement, `WhisperEngine.release()`. `onInterrupt` ne nettoie rien (déclenchable par n'importe quelle app via `AccessibilityManager.interrupt()`).
 - Notification FGS : canal `murmure_recording` (importance LOW), texte « Murmure écoute… », icône petite monochrome.
 
 ### `BubbleOverlay.kt`
@@ -255,7 +255,7 @@ object ModelManager {
 ### `HistoryStore.kt`
 Fichier `filesDir/history.json` : tableau JSON, plus récent en premier. Entrée :
 `{ "id": UUID, "date": epochMillis, "text": String, "raw": String, "durationSec": Double, "language": "fr"|"en"|null, "appPackage": String|null, "outcome": "SET_TEXT"|"PASTED"|"CLIPBOARD_ONLY"|"NOTHING", "modelId": String }`.
-Fonctions pures testables `toJson(list): String`, `fromJson(s): List<HistoryItem>` (JSON invalide → liste vide, fichier renommé `.corrupt`). `add` (cap 500), `delete(id)`, `clear()`, `all()`. Écriture atomique (fichier temporaire + rename), accès `synchronized`. Le texte n'est jamais journalisé dans logcat.
+Fonctions pures testables `toJson(list): String`, `fromJson(s): List<HistoryItem>` (JSON invalide → liste vide, fichier renommé `.corrupt`). `add` (cap 500), `delete(id)`, `clear()` (supprime aussi `.corrupt`), `all()`. Écriture atomique (fichier temporaire + rename), accès `synchronized`. Le texte n'est jamais journalisé dans logcat.
 Le champ `language` est rempli via `external fun nativeLastLanguage(ctx: Long): String` (langue utilisée par le dernier `nativeTranscribe`, `""` si inconnue → `null`) ; à ajouter à `WhisperBridge`.
 
 ### `MurmurePrefs.kt` (SharedPreferences `murmure_prefs`)

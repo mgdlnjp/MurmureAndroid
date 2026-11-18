@@ -4,8 +4,8 @@
 - **Date** : 2026-11-17
 - **Projet** : ~/Documents/PhoneApp/MurmureAndroid
 - **Branche** : feature/murmure-android-bulle (principale : main)
-- **Étape courante** : 4 — Reviewer
-- **Cycle courant** : 1
+- **Étape courante** : 4 — Reviewer (cycle 2)
+- **Cycle courant** : 2
 
 ## Journal
 - 2026-11-17 : dépôt initialisé, branche feature créée.
@@ -14,3 +14,6 @@
 - 2026-11-18 : Tester FAIL (A1 bloquante allowBackup ; A2-A4 non bloquantes). Cycle 1 — Coder.
 - 2026-11-18 : Coder cycle 1 terminé (A1-A4 corrigées, jest 64, gradle 129). Étape 3 — Tester (re-test).
 - 2026-11-18 : Tester cycle 1 PASS (jest 67, gradle 144). Étape 4 — Reviewer.
+- 2026-11-18 : Reviewer CHANGES_REQUESTED (R1 : API 26 non protégées, minSdk 24). Cycle 2 — Coder.
+- 2026-11-18 : Coder cycle 2 terminé (R1 + recos 1-8, jest 68, gradle 158, lint OK). Étape 3 — Tester (cycle 2).
+- 2026-11-18 : Tester cycle 2 PASS (jest 68, gradle 176, lint OK, minSdk 26). Étape 4 — Reviewer (cycle 2).

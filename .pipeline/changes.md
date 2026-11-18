@@ -125,3 +125,63 @@ Cycle 0 (première implémentation) : aucune anomalie de Tester ou de Reviewer �
 2. A2 : dicter dans l'app A, passer à une app B sans champ exposé avec le clavier ouvert (WebView, Flutter), puis dicter. Le texte doit aller dans le presse-papiers avec un toast, jamais dans A. Vérifier aussi qu'un usage normal (Messages, Gmail) insère toujours directement : un focus brièvement `null` ne doit pas gêner, grâce au repli sur `findFocus` à l'insertion.
 3. A3 : champ avec `maxLength` ou masque de saisie (téléphone, carte), champ WebView. Aucun doublon ; le texte reste disponible dans le presse-papiers.
 4. A4 : désactiver le service pendant TRANSCRIBING. Aucune insertion, aucune entrée d'historique, aucune exception de bulle ; le service peut être réactivé ensuite normalement.
+
+# Cycle 2 — corrections de la revue (`.pipeline/review.md`) : R1 + recommandations 1 à 8
+
+## Branche
+- `feature/murmure-android-bulle`, dernier commit inchangé : `26ae7d5`. Rien n'a été commité ni poussé, et `main` n'a pas été touchée.
+
+## Fichiers modifiés (cycle 2)
+
+| chemin | type de changement | résumé |
+|---|---|---|
+| `app.config.ts` | modifié | plugin `['expo-build-properties', { android: { minSdkVersion: 26 } }]` (R1). La dépendance était déjà présente dans `package.json` |
+| `modules/murmure-native/android/build.gradle` | modifié | `lintOptions { abortOnError false }` remplacé par `lint { error 'NewApi'; abortOnError true }` (R1, reco 12) |
+| `.../core/MurmureAccessibilityService.kt` | modifié | `createNotificationChannel()` protégé par `SDK_INT < 26 → return`. `notificationBuilder()` utilise `Notification.Builder(ctx, id)` en 26+ et le constructeur déprécié avant (R1). `onInterrupt()` ne fait plus rien : le nettoyage est réservé à onUnbind/onDestroy (reco 1). Le FGS typé micro est désormais gardé par `SDK_INT >= 30` au lieu de 29 (lint InlinedApi : la constante est API 30) |
+| `.../core/TextInserter.kt` | modifié | `fieldInfoOf` : `isShowingHintText` en 26+, sinon `false`. `hintText` (API 26) n'est plus appelé dans la branche < 26 (R1). PROBABLY_APPLIED → `SET_TEXT` **sans** copie silencieuse (reco 5). `copyToClipboard` marque le clip **sensible** (`true`) : `ClipDescription.EXTRA_IS_SENSITIVE` en 33+, clé chaîne `android.content.extra.IS_SENSITIVE` avant (reco 5) |
+| `.../core/InsertionSafety.kt` | modifié | `SetTextCheck.verdict` teste « contenu inchangé → FAILED » **avant** `contains` (reco 3) |
+| `.../cpp/murmure_jni.cpp` | modifié | si la langue n'est ni fr ni en après détection (y compris en cas d'échec de la détection) → `"fr"`. `params.language` n'est plus jamais `"auto"` ; `lastLanguage` = langue forcée. La branche `whisper_full_lang_id` est devenue inutile et a été supprimée (reco 2) |
+| `.../core/HistoryStore.kt` | modifié | `clear()` supprime aussi `history.json.corrupt` ; ajout de `corruptFile()` (reco 4) |
+| `.../core/AudioRecorder.kt` | modifié | le thread de lecture est seul à appeler `release()`, dans un `finally`. `shutdown()` se contente de `stop()` (qui débloque `read()`), puis `join(500)`. `stop()` et `release()` sont sérialisés par `recordLock` (reco 6) |
+| `.../core/ModelManager.kt` | modifié | `failureFor(e, cancelled)` (pur) : après `cancel`/`delete`, toute `IOException` devient `DownloadCancelledException`. Vérification du drapeau avant `finalizeDownload` et juste avant le `rename` : un modèle supprimé pendant la vérification SHA n'est pas réinstallé (reco 7) |
+| `.../core/TextCleanup.kt` | modifié | `MARKER_WORDS` est partagé entre les parenthèses et les astérisques : `*mot*` n'est supprimé que si le mot figure dans la liste (reco 8). Ajouts à la liste : `rire`, `laughs`, `laughing`, `soupir`, `sighs` |
+| `.../test/.../Cycle2Test.kt` | créé | 13 tests JVM : ordre de `SetTextCheck` (4), astérisques (4), `ModelManager.failureFor` (4), clé legacy IS_SENSITIVE (1) |
+| `.../test/.../Cycle1EdgeCasesTest.kt` | modifié | `unchangedFieldAlreadyContainingDictationIsConfirmed` (CONFIRMED) devient `…IsFailed` (FAILED) : ce test encodait l'ancien comportement O5, **changé volontairement** par la reco 3. Commentaire « onInterrupt -> cleanup » corrigé |
+| `.../test/.../StorageWithFakeContextTest.kt` | modifié (ajout) | `clearAlsoDeletesCorruptCopy` |
+| `__tests__/appConfig.test.ts` | modifié (ajout) | vérifie `expo-build-properties` avec `minSdkVersion: 26` |
+| `.pipeline/specs.md` | modifié | hypothèse minSdk = 26 ; repli langue fr ; clip sensible et nouvel ordre SET_TEXT ; `onInterrupt` sans nettoyage ; `clear()` supprime `.corrupt` |
+| `README.md` | modifié | prérequis Android 8.0 (API 26), clip marqué sensible, pas de copie quand l'insertion directe réussit |
+
+## Décisions techniques (cycle 2)
+- **R1** : minSdk 26 passe par `expo-build-properties`, la voie Expo standard (→ `android.minSdkVersion=26` dans `gradle.properties`, lu par l'app et par `expo-module-gradle-plugin` pour le module). Les gardes `SDK_INT` sont conservées comme demandé, ce qui produit 3 avertissements lint `ObsoleteSdkInt`, acceptés et non bloquants. `NewApi` est en erreur et `abortOnError true` : le lint du module passe (0 erreur, 16 avertissements, aucun NewApi ni InlinedApi).
+- **Reco 1** : `onInterrupt` ne fait plus rien. Interrompre une dictée sur un simple `interrupt()` venant d'une app tierce serait un vecteur de déni de service, et l'API ne prévoit pas de « retour vocal » à couper chez nous.
+- **Reco 3** : conséquence voulue : si l'app ignore SET_TEXT alors que le champ contenait déjà le texte dicté, on colle (repli) au lieu de considérer la dictée comme insérée.
+- **Reco 4** : on conserve la copie `.corrupt`, utile pour un diagnostic manuel, mais « Vider l'historique » l'efface. Ainsi aucun texte dicté ne survit à un `clear()`.
+- **Reco 5** : la copie silencieuse en PROBABLY_APPLIED est supprimée, la dictée reste dans l'historique. Les copies de repli (PASTE et CLIPBOARD_ONLY) sont marquées sensibles (`true`) : Android 13+ masque l'aperçu, et Gboard n'archive pas le texte. Le collage par `ACTION_PASTE` n'en est pas affecté.
+- **Reco 6** : le thread de lecture possède l'AudioRecord, donc aucun `release()` ne peut tomber pendant un `read()`, même si `join` expire. Le `stop()` éventuel sur un objet déjà libéré lève une `IllegalStateException`, qui est ignorée.
+- **Reco 7** : la traduction d'erreur est centralisée dans `download()` (fonction pure testable `failureFor`) plutôt que dans chaque point d'échec.
+- **Hors liste** : la garde du FGS typé passe de 29 à 30 (InlinedApi signalé par le lint, désormais bloquant pour NewApi). En API 29, le type `microphone` n'existe pas et `startForeground` sans type suffit.
+- Recos 9 à 12 : non traitées (optionnelles), sauf le lint NewApi en erreur (partie de la 12).
+
+## Corrections de cycle
+| cycle | anomalie | traitement |
+|---|---|---|
+| 2 | R1 (bloquant) : API 26+ sans garde, minSdk 24 | minSdk 26 via `expo-build-properties` + gardes `SDK_INT` + lint `NewApi` en erreur, `abortOnError true` |
+| 2 | Recos 1 à 8 | voir le tableau ci-dessus |
+
+## Commandes de vérification (cycle 2)
+| commande | résultat |
+|---|---|
+| `npx tsc --noEmit` | 0 erreur |
+| `npx jest` | 9 suites, **68 tests OK** (+1) |
+| `CI=1 npx expo prebuild --platform android --clean` | OK ; `android/gradle.properties` : `android.minSdkVersion=26` |
+| `./gradlew :murmure-native:testDebugUnitTest :murmure-native:lintDebug assembleDebug` (JBR, `ANDROID_HOME`) | BUILD SUCCESSFUL. **158 tests JVM, 0 échec** (144 + 14). Lint du module : 0 erreur, aucun `NewApi`. Manifeste fusionné debug : `android:minSdkVersion="26"`. `lib/arm64-v8a/libmurmure_whisper.so` présent dans l'APK |
+
+## Points à vérifier (cycle 2)
+1. Manifeste fusionné et APK : `minSdkVersion=26` (`aapt2 dump badging` → `sdkVersion:'26'`).
+2. Presse-papiers (Android 13+) : en repli, l'aperçu système doit afficher un contenu masqué, et le texte ne doit pas apparaître dans l'historique du presse-papiers de Gboard. Le collage doit toujours fonctionner.
+3. Champ qui reformate (masque téléphone) : pas de doublon, et plus de copie dans le presse-papiers.
+4. Supprimer un modèle pendant son téléchargement : l'UI doit afficher « annulé » et non une erreur réseau, et aucun fichier ne doit rester dans `files/whisper-models/`.
+5. Dictées répétées et rapides (tap, tap) et arrêt automatique à 120 s : pas de crash natif d'AudioRecord, et le micro est bien libéré (indicateur vert d'Android 12+ éteint).
+6. `*rires*` et `(musique)` sont toujours filtrés ; « 2 * 3 * 4 » est conservé.
+7. Langue `auto` sur un audio ni français ni anglais : transcription en français, `language: "fr"` dans l'historique.

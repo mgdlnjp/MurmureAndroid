@@ -24,7 +24,13 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
   },
-  plugins: ['expo-router', 'expo-localization', './plugins/withMurmure.js'],
+  plugins: [
+    'expo-router',
+    'expo-localization',
+    // minSdk 26 (Android 8.0) : NotificationChannel, isShowingHintText, service de premier plan micro.
+    ['expo-build-properties', { android: { minSdkVersion: 26 } }],
+    './plugins/withMurmure.js',
+  ],
   experiments: {
     typedRoutes: true,
   },

@@ -80,18 +80,18 @@ class SetTextCheckEdgeCasesTest {
   }
 
   /**
-   * Caractérisation (observation O5, non bloquante) : si le champ contenait déjà le texte dicté
-   * et que l'app ignore SET_TEXT (action acceptée, contenu inchangé), le verdict est CONFIRMED.
-   * Pas de doublon, mais pas de collage ni de copie : la dictée n'est conservée que dans l'historique.
+   * Cycle 2 (recommandation 3, ancien comportement O5 volontairement changé) : si le champ contenait
+   * déjà le texte dicté et que l'app ignore SET_TEXT (contenu inchangé), le verdict est FAILED,
+   * ce qui déclenche le repli par collage au lieu de perdre la dictée.
    */
-  @Test fun unchangedFieldAlreadyContainingDictationIsConfirmed() {
-    assertEquals(SetTextVerdict.CONFIRMED, SetTextCheck.verdict(true, true, "ok merci", "ok merci", "ok"))
+  @Test fun unchangedFieldAlreadyContainingDictationIsFailed() {
+    assertEquals(SetTextVerdict.FAILED, SetTextCheck.verdict(true, true, "ok merci", "ok merci", "ok"))
   }
 }
 
 class TranscriptionGuardEdgeCasesTest {
   @Test fun interruptDuringTranscriptionThenNewDictation() {
-    // onInterrupt -> cleanup -> invalidate ; le service reste actif.
+    // Annulation (cleanup) -> invalidate ; le service reste actif.
     val g = TranscriptionGuard()
     val first = g.begin()
     g.invalidate()

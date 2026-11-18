@@ -3,7 +3,14 @@ package app.murmure.core
 /** Nettoyage de la sortie brute de Whisper (logique pure). */
 object TextCleanup {
   // Marqueurs non vocaux : [BLANK_AUDIO], [Musique], (musique), [inaudible], *rires*…
-  private val MARKERS = Regex("""\[[^\]]*]|\((?:musique|music|applaudissements|applause|rires|laughter|silence|inaudible|bruit|noise|blank_audio)[^)]*\)|\*[^*]{1,40}\*""", RegexOption.IGNORE_CASE)
+  // Mots reconnus comme marqueurs non vocaux entre parenthèses ou astérisques ; le reste est conservé
+  // (« Rendez-vous (mardi) », « 2 * 3 * 4 »).
+  private const val MARKER_WORDS =
+    "musique|music|applaudissements|applause|rires|rire|laughter|laughs|laughing|silence|inaudible|bruit|noise|blank_audio|soupir|sighs"
+  private val MARKERS = Regex(
+    """\[[^\]]*]|\(\s*(?:$MARKER_WORDS)[^)]*\)|\*\s*(?:$MARKER_WORDS)[^*]{0,40}\*""",
+    RegexOption.IGNORE_CASE
+  )
   private val SPACES = Regex("""\s+""")
   private val SPACE_BEFORE_PUNCT = Regex("""\s+([,.)])""")
 

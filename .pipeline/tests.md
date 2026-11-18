@@ -1,5 +1,70 @@
 # Tests — Murmure Android
 
+# Cycle 2 (re-test de R1 et des recommandations 1 à 8 de `.pipeline/review.md`)
+
+## Verdict
+**PASS**
+
+R1 (bloquant) et les recommandations 1 à 8 sont corrigés. Je l'ai vérifié par lecture du code de production (diff non commité au-dessus de `26ae7d5`), par les tests et par les builds. Aucune régression : tsc, Jest, prebuild, 176 tests JVM, lint du module (`NewApi` en erreur, `abortOnError true`) et assembleDebug sont au vert. Le manifeste fusionné et l'APK déclarent `minSdkVersion 26`.
+Il reste trois observations non bloquantes (O7 à O9) et la checklist manuelle sur appareil réel.
+
+## Tests ajoutés (cycle 2)
+- `modules/murmure-native/android/src/test/java/app/murmure/core/Cycle2EdgeCasesTest.kt` (nouveau, 18 tests JVM) :
+  - `SetTextCheckCycle2EdgeCasesTest` (5 tests) : champ vide resté vide (null/""), donc FAILED ; champ vide qui reçoit la dictée, donc CONFIRMED ; action refusée, donc FAILED quel que soit le contenu ; masque téléphone et troncature maxLength, donc PROBABLY_APPLIED.
+  - `TextCleanupCycle2EdgeCasesTest` (6 tests) : `*important*` est conservé et `*rires*` supprimé sur la même ligne ; « 5 * 2 = 10 » et « 3 * 4 euros (musique) » sont conservés (sauf le marqueur) ; marqueurs insensibles à la casse et sur plusieurs mots, parenthèses avec espaces ; crochets toujours supprimés ; `*` et `**` seuls donnent "" ; parenthèses ordinaires conservées.
+  - `ModelManagerFailureCycle2Test` (3 tests) : InsufficientStorage après annulation devient CANCELLED ; Checksum sans annulation est conservé (même instance) ; une IOException après annulation donne une nouvelle DownloadCancelledException.
+  - `HistoryStoreClearCycle2Test` (4 tests) : `clear()` sans aucun fichier ne lève pas d'exception ; `clear()` supprime une copie `.corrupt` orpheline ; une seconde corruption remplace la copie précédente ; `add` après `clear` fonctionne, sans `.corrupt` résiduel.
+
+Aucun fichier de production n'a été modifié par le Tester.
+
+### Test existant modifié par le Coder : `Cycle1EdgeCasesTest.kt` (vérifié, modification légitime)
+`unchangedFieldAlreadyContainingDictationIsConfirmed` (attendu : CONFIRMED) devient `…IsFailed` (attendu : FAILED). Ce test, écrit par le Tester au cycle 1, ne faisait que **caractériser** l'observation O5, sans fixer d'exigence. La recommandation 3 de la revue demande précisément d'inverser ce comportement (tester `now == before` avant `contains`). La nouvelle assertion correspond à la spécification mise à jour (`.pipeline/specs.md`) et au code. Les entrées du test (`"ok merci"`, `"ok merci"`, `"ok"`) sont inchangées : seul le verdict attendu change. La modification du commentaire `onInterrupt -> cleanup` est cohérente avec la recommandation 1. **Modification acceptée.**
+
+## Résultats (cycle 2)
+| commande | résultat |
+|---|---|
+| `npx tsc --noEmit` | 0 erreur (exit 0) |
+| `npx jest` | **9 suites, 68 tests : 68 réussis, 0 échoué, 0 ignoré** |
+| `CI=1 npx expo prebuild --platform android --clean` | OK ; `android/gradle.properties:79` : `android.minSdkVersion=26` ; `app/build.gradle` : `minSdkVersion rootProject.ext.minSdkVersion` |
+| `./gradlew :murmure-native:testDebugUnitTest :murmure-native:lintDebug assembleDebug` (JAVA_HOME = JBR d'Android Studio, ANDROID_HOME = ~/Library/Android/sdk) | **BUILD SUCCESSFUL** en 5 min 17 s (exit 0) |
+| relance de `:murmure-native:testDebugUnitTest :murmure-native:lintDebug` après ajout des tests du Tester | BUILD SUCCESSFUL |
+| résultats JUnit (`build/test-results/testDebugUnitTest`) | **31 classes, 176 tests : 176 réussis, 0 échec, 0 erreur, 0 ignoré** (158 du Coder + 18 du Tester) |
+| `lint-results-debug.xml` (module) | 0 erreur, 16 avertissements : UseKtx ×8, ObsoleteSdkInt ×3, ChromeOsAbiSupport, NewerVersionAvailable, QueryPermissionsNeeded, UnusedAttribute, UsableSpace. **Aucun NewApi ni InlinedApi** |
+| manifestes fusionnés debug (`processDebugMainManifest`, `expoDebugOverrideMaxSdkConflicts`) | `android:minSdkVersion="26"` |
+| `aapt2 dump badging app-debug.apk` | `minSdkVersion:'26'`, `targetSdkVersion:'36'` |
+| `unzip -l app-debug.apk` | 77,6 Mo ; `lib/arm64-v8a/libmurmure_whisper.so` (1 884 624 octets) ; uniquement des bibliothèques arm64-v8a |
+| git | branche `feature/murmure-android-bulle`, HEAD `26ae7d5`, rien commité ; `main` = `1567c6f`, inchangée |
+
+## Vérification de R1 et des recommandations (lecture du code)
+| point | statut | constat |
+|---|---|---|
+| R1 (bloquant) | **corrigé** | `app.config.ts` déclare `['expo-build-properties', { android: { minSdkVersion: 26 } }]`. C'est bien appliqué par prebuild (gradle.properties) et visible dans le manifeste fusionné et l'APK (26). Défense en profondeur : `createNotificationChannel()` retourne si SDK < 26 ; `notificationBuilder()` utilise le constructeur déprécié si SDK < 26 ; `fieldInfoOf` n'appelle plus `hintText` et appelle `isShowingHintText` seulement en 26+. Le lint `NewApi` est en erreur avec `abortOnError true`, et il passe |
+| Garde FGS 29 → 30 | **correct** | `ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE` est API 30 (R), et lint InlinedApi l'a confirmé. En API 26-29, `startForeground(id, notif)` sans type est le comportement attendu : le type micro n'est exigé qu'à partir de l'API 30, puis la permission typée à partir de 34. Aucune perte fonctionnelle |
+| 1 onInterrupt | **corrigé** | `onInterrupt()` est vide (commentaire seulement). `cleanup()` n'est plus appelé que par `teardown()` (onUnbind/onDestroy) et par les chemins internes d'annulation |
+| 2 langue fr/en | **corrigé** | `murmure_jni.cpp` : après `detectFrOrEn`, toute valeur autre que fr/en (y compris `""` en cas d'échec) devient `"fr"`. `params.language` n'est jamais `"auto"`, `detect_language = false`, et `lastLanguage = lang` n'est posé qu'après le succès de `whisper_full`. `lang.c_str()` reste valide pendant `whisper_full` (`lang` est en portée) |
+| 3 ordre SetTextCheck | **corrigé** | `now == before.orEmpty()` → FAILED est évalué avant `contains`. Couvert par 4 + 5 tests |
+| 4 `.corrupt` | **corrigé** | `clear()` supprime `history.json.corrupt` sous le même verrou. Le chemin est unifié (`corruptFile(context)`) entre `read()` et `clear()` |
+| 5 presse-papiers | **corrigé** | PROBABLY_APPLIED → `SET_TEXT` sans copie. `copyToClipboard` met `true` sur `EXTRA_IS_SENSITIVE` (33+) ou sur la clé chaîne équivalente (< 33). Les seuls appelants restants sont les replis PASTE et CLIPBOARD_ONLY |
+| 6 AudioRecord | **corrigé, pas de double release** | `release()` n'est appelé qu'à un seul endroit pour un enregistrement démarré : le `finally` de `readLoop`, exécuté une fois par thread. `shutdown()` ne fait plus que `stop()`, sous `recordLock`, puis `join(500)`. Les autres `release()` (`start()` en échec, `createRecord` non initialisé) concernent des objets jamais passés au thread. `stop()` après la libération par le thread lève IllegalStateException, qui est ignorée. `release()` ne peut pas tomber pendant un `read()` |
+| 7 delete pendant téléchargement | **corrigé** (voir O7) | `download()` traduit toute IOException via `failureFor(e, cancelFlag.get())`. Le drapeau est revérifié avant `finalizeDownload` et avant le `rename`. Les exceptions sont bien des sous-classes d'IOException |
+| 8 astérisques | **corrigé** | `\*\s*(?:MARKER_WORDS)[^*]{0,40}\*` : seuls les mots listés sont supprimés. « 2 * 3 * 4 » et `*vraiment*` sont conservés |
+
+## Anomalies (cycle 2)
+Aucune anomalie bloquante.
+
+Observations non bloquantes :
+- **O7 — Course résiduelle delete/rename (ModelManager.kt, `finalizeDownload` l.191-194 et `delete` l.102-108).** Scénario : la vérification `cancelFlag` de `finalizeDownload` passe, puis `delete()` positionne le drapeau et supprime `installedFile` (encore absent), puis `part.renameTo(target)` réussit, puis `delete()` supprime `partFile` (déjà renommé). Attendu : modèle supprimé, CANCELLED. Obtenu : modèle installé et téléchargement terminé avec succès. La fenêtre est de quelques microsecondes, sans conséquence de sécurité. Correction simple : dans `delete()`, supprimer `partFile` **avant** `installedFile` (le rename échoue alors, ou le fichier installé est supprimé ensuite).
+- **O8 — Préexistant, non introduit par le cycle 2 (AudioRecorder.kt l.95, l.143).** Si `join(500)` expire et qu'un `start()` suit immédiatement, `running` (champ partagé) repasse à `true` et l'ancien thread peut continuer sa boucle sur un AudioRecord arrêté, en écrivant dans le même tampon `samples`. C'est peu probable : `stop()` interrompt `read()`, qui renvoie une valeur ≤ 0 en pratique. Piste : un drapeau `running` par session (capturé par le thread) plutôt que global.
+- **O9 — 3 avertissements lint ObsoleteSdkInt.** Ils sont dus aux gardes `SDK_INT >= 26` conservées volontairement. C'est accepté.
+
+## Non-régression (cycle 2)
+- Jest : 68/68 (les 67 du cycle 1 plus 1 test minSdk).
+- Tests JVM : les 144 du cycle 1 passent tous, y compris TargetPolicy, TranscriptionGuard, HistoryStore (fichier et corruption), ModelManager (Range, reprise, SHA) et TextCleanup (crochets, parenthèses). Seul le test O5 a été inversé, de façon légitime (voir plus haut).
+- APK : seule l'ABI arm64-v8a est présente ; `libmurmure_whisper.so` est présent ; le build release n'a pas été relancé dans ce cycle (aucun changement dans le plugin de manifeste).
+- À valider sur appareil (non automatisable ici) : points 1 à 7 de « Points à vérifier (cycle 2) » dans `.pipeline/changes.md`, en particulier l'aperçu masqué du presse-papiers sur Android 13+, le micro libéré après des dictées rapides et l'arrêt à 120 s, et la langue `auto` sur un audio ni français ni anglais (sortie en fr).
+
+---
+
 # Cycle 1 (re-test des anomalies A1 à A4)
 
 ## Verdict

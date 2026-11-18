@@ -81,10 +81,19 @@ object ModelManager {
     }
     try {
       doDownload(context, spec, onProgress)
+    } catch (e: IOException) {
+      throw failureFor(e, cancelFlag.get())
     } finally {
       synchronized(lock) { currentId = null }
     }
   }
+
+  /**
+   * Erreur à remonter (pur) : après une annulation (cancel ou delete du modèle en cours),
+   * toute erreur d'E/S induite (.part supprimé, flux coupé, rename impossible) devient CANCELLED.
+   */
+  fun failureFor(e: IOException, cancelled: Boolean): IOException =
+    if (cancelled && e !is DownloadCancelledException) DownloadCancelledException() else e
 
   fun cancel(id: String) {
     if (currentId == id) cancelFlag.set(true)
@@ -160,6 +169,7 @@ object ModelManager {
       connection.disconnect()
     }
 
+    if (cancelFlag.get()) throw DownloadCancelledException()
     finalizeDownload(context, spec, part)
     onProgress(spec.sizeBytes, spec.sizeBytes)
   }
@@ -178,6 +188,8 @@ object ModelManager {
       part.delete()
       throw ModelChecksumException("sha256 mismatch")
     }
+    // Suppression demandée pendant la vérification : ne pas réinstaller le modèle.
+    if (cancelFlag.get()) throw DownloadCancelledException()
     val target = installedFile(context, spec)
     target.delete()
     if (!part.renameTo(target)) throw IOException("rename failed")

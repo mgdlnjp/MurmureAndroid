@@ -43,10 +43,11 @@ object SetTextCheck {
     if (!actionOk) return SetTextVerdict.FAILED
     if (!refreshed) return SetTextVerdict.PROBABLY_APPLIED
     val now = after.orEmpty()
+    // Contenu inchangé : SET_TEXT a été ignoré, même si le champ contenait déjà le texte dicté.
+    if (now == before.orEmpty()) return SetTextVerdict.FAILED
     if (now.contains(inserted)) return SetTextVerdict.CONFIRMED
     // Champ reformaté ou tronqué (maxLength, masque) : le texte a changé, donc SET_TEXT a agi.
-    if (now != before.orEmpty()) return SetTextVerdict.PROBABLY_APPLIED
-    return SetTextVerdict.FAILED
+    return SetTextVerdict.PROBABLY_APPLIED
   }
 }
 

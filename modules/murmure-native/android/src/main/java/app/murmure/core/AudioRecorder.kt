@@ -17,6 +17,8 @@ class AudioRecorder(private val onLimitReached: () -> Unit) {
 
   private val mainHandler = Handler(Looper.getMainLooper())
   private val bufferLock = Any()
+  /** Sérialise stop() (thread appelant) et release() (thread de lecture) d'un même AudioRecord. */
+  private val recordLock = Any()
   private var record: AudioRecord? = null
   private var thread: Thread? = null
   @Volatile private var running = false
@@ -69,7 +71,25 @@ class AudioRecorder(private val onLimitReached: () -> Unit) {
     null
   }
 
+  /**
+   * Boucle de lecture. Le thread de lecture est seul propriétaire de la libération de [r] :
+   * release() n'est jamais appelé pendant un read() en cours, même si join() expire dans [shutdown].
+   */
   private fun readLoop(r: AudioRecord, chunk: Int) {
+    try {
+      readSamples(r, chunk)
+    } finally {
+      synchronized(recordLock) {
+        try {
+          r.release()
+        } catch (e: Exception) {
+          Log.w(TAG, "release failed: ${e.javaClass.simpleName}")
+        }
+      }
+    }
+  }
+
+  private fun readSamples(r: AudioRecord, chunk: Int) {
     val buf = ShortArray(maxOf(chunk, 1024))
     val max = AudioUtils.SAMPLE_RATE * MAX_SECONDS
     while (running) {
@@ -111,10 +131,13 @@ class AudioRecorder(private val onLimitReached: () -> Unit) {
     running = false
     val r = record
     record = null
-    try {
-      r?.stop()
-    } catch (e: Exception) {
-      // ignoré
+    // stop() débloque read() ; si le thread de lecture a déjà libéré l'AudioRecord, stop() lève et c'est ignoré.
+    synchronized(recordLock) {
+      try {
+        r?.stop()
+      } catch (e: Exception) {
+        // ignoré
+      }
     }
     try {
       thread?.join(500)
@@ -122,6 +145,6 @@ class AudioRecorder(private val onLimitReached: () -> Unit) {
       Thread.currentThread().interrupt()
     }
     thread = null
-    r?.release()
+    // Pas de release() ici : le thread de lecture s'en charge à sa sortie (voir readLoop).
   }
 }

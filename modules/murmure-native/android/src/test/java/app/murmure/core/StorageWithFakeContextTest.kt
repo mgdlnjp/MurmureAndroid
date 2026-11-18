@@ -80,6 +80,16 @@ class HistoryStoreFileTest {
     assertEquals(1, HistoryStore.all(ctx).size)
   }
 
+  // Cycle 2, recommandation 4 : clear() efface aussi la copie corrompue (texte dicté).
+  @Test fun clearAlsoDeletesCorruptCopy() {
+    File(dir, "history.json").writeText("{oops")
+    assertTrue(HistoryStore.all(ctx).isEmpty())
+    assertTrue(File(dir, "history.json.corrupt").exists())
+    HistoryStore.clear(ctx)
+    assertFalse(File(dir, "history.json.corrupt").exists())
+    assertEquals("[]", File(dir, "history.json").readText())
+  }
+
   @Test fun parseThrowsOnNonArray() {
     try {
       HistoryStore.parse("{}")

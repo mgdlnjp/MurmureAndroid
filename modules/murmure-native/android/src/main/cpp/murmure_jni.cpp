@@ -33,7 +33,7 @@ void throwRuntime(JNIEnv *env, const char *message) {
 }
 
 // Détection restreinte à fr/en : on compare uniquement ces deux probabilités.
-// Retourne "" si la détection échoue (whisper choisira alors lui-même).
+// Retourne "" si la détection échoue (l'appelant se replie alors sur "fr").
 std::string detectFrOrEn(whisper_context *ctx, const float *samples, int n, int nThreads) {
     if (whisper_pcm_to_mel(ctx, samples, n, nThreads) != 0) {
         LOGE("whisper_pcm_to_mel failed");
@@ -116,9 +116,13 @@ Java_app_murmure_core_WhisperBridge_nativeTranscribe(JNIEnv *env, jobject /* thi
     if (lang != "fr" && lang != "en") {
         lang = detectFrOrEn(wrapper->ctx, pcm.data(), static_cast<int>(n), threads);
     }
+    // Jamais de transcription dans une autre langue que fr/en : repli explicite sur le français.
+    if (lang != "fr" && lang != "en") {
+        lang = "fr";
+    }
 
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    params.language = lang.empty() ? "auto" : lang.c_str();
+    params.language = lang.c_str();
     params.detect_language = false;
     params.translate = false;
     params.print_progress = false;
@@ -134,16 +138,7 @@ Java_app_murmure_core_WhisperBridge_nativeTranscribe(JNIEnv *env, jobject /* thi
         return nullptr;
     }
 
-    if (!lang.empty()) {
-        wrapper->lastLanguage = lang;
-    } else {
-        const int id = whisper_full_lang_id(wrapper->ctx);
-        const char *detected = id >= 0 ? whisper_lang_str(id) : nullptr;
-        if (detected != nullptr) {
-            const std::string d = detected;
-            if (d == "fr" || d == "en") wrapper->lastLanguage = d;
-        }
-    }
+    wrapper->lastLanguage = lang;
 
     std::string text;
     const int segments = whisper_full_n_segments(wrapper->ctx);

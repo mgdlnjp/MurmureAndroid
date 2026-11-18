@@ -14,6 +14,8 @@ Pas de clavier (IME) : Murmure fonctionne avec votre clavier habituel.
 
 ## Installation (APK)
 
+Prérequis : Android 8.0 (API 26) ou plus récent, processeur 64 bits ARM.
+
 1. Récupérer l'APK produit par EAS (`eas build -p android --profile preview`, lien de téléchargement fourni par EAS) et l'ouvrir sur le téléphone. Autoriser l'installation depuis cette source si Android le demande.
 2. Ouvrir Murmure et suivre l'assistant :
    1. **Micro** (obligatoire).
@@ -40,14 +42,14 @@ L'assistant propose un bouton « Le bouton est grisé ? » qui mène à cette pr
 - La seule requête réseau est le téléchargement du modèle depuis Hugging Face (`ggerganov/whisper.cpp`), vérifié par taille et empreinte SHA-256.
 - Le service d'accessibilité sert uniquement à détecter un champ de texte actif (pour afficher la bulle) et à y insérer la dictée. Le contenu des champs n'est lu qu'au moment de l'insertion, n'est ni stocké ni journalisé. La bulle n'apparaît jamais sur les champs mot de passe / sensibles, ni sur l'écran de verrouillage, ni dans Murmure.
 - L'historique (500 dictées max) est stocké localement dans l'app ; il peut être vidé à tout moment.
-- En cas de repli par presse-papiers, l'ancien contenu du presse-papiers n'est pas restauré (Android 10+ interdit sa lecture en arrière-plan).
+- En cas de repli par presse-papiers, le texte copié est marqué « sensible » (aperçu masqué sur Android 13+, non archivé par les claviers qui respectent ce marquage) ; l'ancien contenu du presse-papiers n'est pas restauré (Android 10+ interdit sa lecture en arrière-plan). Aucune copie n'est faite quand l'insertion directe a réussi.
 
 ## Limites connues
 
 - **Micro en arrière-plan** (Android 11+, durci en 14+) : Murmure démarre un service au premier plan de type « micro » au moment du tap. Selon les constructeurs, Android peut tout de même couper le micro ; Murmure le détecte (audio entièrement nul) et affiche « Le micro a été coupé par Android… ». Accorder l'autorisation « Affichage par-dessus les autres apps » améliore la situation.
 - **Performances** : Small q5_1 ≈ 300–400 Mo de RAM ; sur un téléphone milieu de gamme, compter plusieurs secondes pour 10 s d'audio. Base est nettement plus rapide. Fixer la langue (FR ou EN) évite la passe de détection. Temps mesurés : *à compléter lors des tests sur appareil*.
 - **Insertion** : certaines apps (WebView, Compose, Flutter, jeux) n'acceptent pas l'insertion directe ; Murmure colle alors le texte, ou à défaut le laisse dans le presse-papiers (« Texte copié — colle-le avec un appui long »).
-- Architecture : `arm64-v8a` uniquement.
+- Architecture : `arm64-v8a` uniquement. Android 8.0 (API 26) minimum.
 
 ## Développement
 
