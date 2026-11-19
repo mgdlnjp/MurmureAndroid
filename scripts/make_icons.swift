@@ -12,8 +12,9 @@ import AppKit
 let outDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "."
 let size: CGFloat = 1024
 
-let orangeLight = NSColor(calibratedRed: 0.99, green: 0.60, blue: 0.24, alpha: 1) // #FC993D
-let orangeDark = NSColor(calibratedRed: 0.89, green: 0.30, blue: 0.05, alpha: 1)  // #E34D0D
+// Assombri pour que le blanc garde un contraste ≥ 3:1 sur tout le dégradé.
+let orangeLight = NSColor(calibratedRed: 0.91, green: 0.447, blue: 0.11, alpha: 1) // #E8721C
+let orangeDark = NSColor(calibratedRed: 0.761, green: 0.255, blue: 0.047, alpha: 1) // #C2410C
 
 func render(_ name: String, _ draw: () -> Void) {
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size), pixelsHigh: Int(size),

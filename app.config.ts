@@ -17,7 +17,7 @@ const config: ExpoConfig = {
     // Permissions de stockage ajoutées par défaut par Expo : inutiles ici.
     blockedPermissions: ['android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'],
     adaptiveIcon: {
-      backgroundColor: '#F97316',
+      backgroundColor: '#D9600F',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
