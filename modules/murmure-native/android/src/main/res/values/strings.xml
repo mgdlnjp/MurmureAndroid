@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="murmure_accessibility_label">Murmure</string>
+  <string name="murmure_accessibility_summary">Floating dictation bubble: you speak, Murmure writes.</string>
+  <string name="murmure_accessibility_description">Murmure uses this service only to detect when a text field is active, in order to show its floating dictation bubble, and to insert the text you dictated into that field. Password and sensitive fields are ignored. Nothing read on screen is stored or sent anywhere: transcription happens entirely on your phone.</string>
+  <string name="murmure_bubble_start">Murmure: tap to dictate</string>
+  <string name="murmure_bubble_stop">Murmure: tap to stop, long press to cancel</string>
+  <string name="murmure_bubble_transcribing">Murmure: transcribing…</string>
+  <string name="murmure_bubble_error">Murmure: error</string>
+  <string name="murmure_notification_channel">Dictation</string>
+  <string name="murmure_notification_title">Murmure is listening…</string>
+  <string name="murmure_notification_text">Tap the bubble again to stop.</string>
+  <string name="murmure_toast_model_missing">Download a Whisper model in the Murmure app first.</string>
+  <string name="murmure_toast_mic_denied">Murmure needs microphone access.</string>
+  <string name="murmure_toast_mic_failed">Could not start the microphone (another app may be using it).</string>
+  <string name="murmure_toast_mic_silenced">The microphone was muted by Android. Open Murmure and check its permissions, then try again.</string>
+  <string name="murmure_toast_nothing_heard">Nothing heard</string>
+  <string name="murmure_toast_cancelled">Dictation cancelled</string>
+  <string name="murmure_toast_transcription_failed">Transcription failed. If this happens often, try the Base model.</string>
+  <string name="murmure_toast_protected_field">Protected field: nothing was inserted</string>
+  <string name="murmure_toast_copied">Text copied — paste it with a long press</string>
+</resources>

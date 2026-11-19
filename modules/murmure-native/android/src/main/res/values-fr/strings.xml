@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="murmure_accessibility_label">Murmure</string>
+  <string name="murmure_accessibility_summary">Bulle de dictée flottante : tu parles, Murmure écrit.</string>
+  <string name="murmure_accessibility_description">Murmure utilise ce service uniquement pour détecter qu\'un champ de texte est actif, afin d\'afficher sa bulle de dictée flottante, et pour insérer dans ce champ le texte que tu as dicté. Les champs mot de passe et sensibles sont ignorés. Rien de ce qui est lu à l\'écran n\'est stocké ni envoyé : la transcription se fait entièrement sur ton téléphone.</string>
+  <string name="murmure_bubble_start">Murmure : touche pour dicter</string>
+  <string name="murmure_bubble_stop">Murmure : touche pour arrêter, appui long pour annuler</string>
+  <string name="murmure_bubble_transcribing">Murmure : transcription…</string>
+  <string name="murmure_bubble_error">Murmure : erreur</string>
+  <string name="murmure_notification_channel">Dictée</string>
+  <string name="murmure_notification_title">Murmure écoute…</string>
+  <string name="murmure_notification_text">Touche à nouveau la bulle pour arrêter.</string>
+  <string name="murmure_toast_model_missing">Télécharge d\'abord un modèle Whisper dans l\'app Murmure.</string>
+  <string name="murmure_toast_mic_denied">Murmure a besoin d\'accéder au micro.</string>
+  <string name="murmure_toast_mic_failed">Impossible de démarrer le micro (une autre app l\'utilise peut-être).</string>
+  <string name="murmure_toast_mic_silenced">Le micro a été coupé par Android. Ouvre Murmure, vérifie ses autorisations, puis réessaie.</string>
+  <string name="murmure_toast_nothing_heard">Rien entendu</string>
+  <string name="murmure_toast_cancelled">Dictée annulée</string>
+  <string name="murmure_toast_transcription_failed">La transcription a échoué. Si cela se répète, essaie le modèle Base.</string>
+  <string name="murmure_toast_protected_field">Champ protégé : rien n\'a été inséré</string>
+  <string name="murmure_toast_copied">Texte copié — colle-le avec un appui long</string>
+</resources>

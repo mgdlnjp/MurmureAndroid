@@ -11,3 +11,18 @@ web-build/
 *.bin
 models/
 .DS_Store
+
+# Expo / native generated (Continuous Native Generation)
+# (racine uniquement : le code natif de modules/murmure-native/android est versionné)
+/android/
+/ios/
+coverage/
+# sorties de build du module natif
+modules/**/android/build/
+modules/**/android/.cxx/
+.gradle/
+expo-env.d.ts
+.kotlin/
+*.tsbuildinfo
+.metro-health-check*
+npm-debug.*
